@@ -1,85 +1,84 @@
-let tokenGoogle = null;
+const formulario = document.getElementById("formulario");
+const campoNumero = document.getElementById("numero");
+const area = document.getElementById("desenho");
+const mensagem = document.getElementById("mensagem");
+const botaoBaixar = document.getElementById("baixar");
 
-// Função chamada automaticamente pelo Google Sign-In após o login bem-sucedido
-window.handleCredentialResponse = function(response) {
-  tokenGoogle = response.credential;
-  console.log("Login efetuado com sucesso!");
-  
-  // Habilita o botão de desenhar após o login
-  const btnDesenhar = document.getElementById("btn-desenhar");
-  if (btnDesenhar) {
-    btnDesenhar.disabled = false;
-  }
-  
-  const mensagem = document.getElementById("mensagem");
-  mensagem.textContent = "Autenticado com sucesso! Escolha um número e clique em Desenhar.";
-  mensagem.style.color = "green";
+let idToken = "";
+let svgAtual = "";
+
+window.handleCredentialResponse = function (response) {
+  idToken = response.credential;
+  mensagem.textContent = "Login realizado com sucesso.";
 };
 
-document.getElementById("formulario").addEventListener("submit", async function(event) {
-  event.preventDefault();
+formulario.addEventListener("submit", async (evento) => {
+  evento.preventDefault();
 
-  const numeroInput = document.getElementById("numero").value;
-  const mensagem = document.getElementById("mensagem");
-  const figura = document.getElementById("desenho");
-  const botaoBaixar = document.getElementById("baixar");
-
-  if (!tokenGoogle) {
-    mensagem.textContent = "Por favor, faça login com o Google primeiro.";
-    mensagem.style.color = "red";
-    return;
-  }
-
-  const numero = parseInt(numeroInput, 10);
-  if (isNaN(numero) || numero < 1 || numero > 100) {
-    mensagem.textContent = "Por favor, insira um número válido entre 1 e 100.";
-    mensagem.style.color = "red";
-    return;
-  }
-
-  mensagem.textContent = "A gerar desenho no servidor...";
-  mensagem.style.color = "blue";
-  figura.innerHTML = "";
+  mensagem.textContent = "";
+  area.innerHTML = "";
   botaoBaixar.hidden = true;
 
+  const numero = Number(campoNumero.value);
+
+  if (!Number.isInteger(numero) || numero < 1 || numero > 100) {
+    mensagem.textContent = "Digite um inteiro entre 1 e 100.";
+    return;
+  }
+
+  if (!idToken) {
+    mensagem.textContent = "Faça login com o Google antes de gerar o desenho.";
+    return;
+  }
+
   try {
-    // Requisição para a nossa Cloudflare Pages Function (/api/desenho)
     const resposta = await fetch("/api/desenho", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${idToken}`
       },
       body: JSON.stringify({
-        numero: numero,
-        credential: tokenGoogle
+        numero: numero
       })
     });
 
-    const dados = await resposta.json();
-
-    if (!resposta.ok) {
-      throw new Error(dados.error || "Erro ao comunicar com o servidor.");
+    if (resposta.status === 400) {
+      mensagem.textContent = "Número inválido.";
+      return;
     }
 
-    // Exibe o desenho SVG retornado pelo servidor e assinado
-    figura.innerHTML = dados.svg;
-    mensagem.textContent = `Desenho gerado e assinado para: ${dados.email}`;
-    mensagem.style.color = "green";
+    if (resposta.status === 401) {
+      mensagem.textContent = "Autenticação inválida. Faça login novamente.";
+      return;
+    }
 
-    // Configura o botão de baixar
+    if (!resposta.ok) {
+      mensagem.textContent = "Não foi possível gerar o desenho.";
+      return;
+    }
+
+    svgAtual = await resposta.text();
+
+    area.innerHTML = svgAtual;
     botaoBaixar.hidden = false;
-    botaoBaixar.onclick = function() {
-      const blob = new Blob([dados.svg], { type: "image/svg+xml" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `desenho_${numero}.svg`;
-      a.click();
-      URL.revokeObjectURL(url);
-    };
 
-  } catch (erro) {
-    mensagem.textContent = `Erro: ${erro.message}`;
-    mensagem.style.color = "red";
+  } catch {
+    mensagem.textContent = "Erro ao comunicar com o servidor.";
   }
+});
+
+botaoBaixar.addEventListener("click", () => {
+  const arquivo = new Blob([svgAtual], {
+    type: "image/svg+xml"
+  });
+
+  const url = URL.createObjectURL(arquivo);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = "exemplo.svg";
+  link.click();
+
+  URL.revokeObjectURL(url);
 });
