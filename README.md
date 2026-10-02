@@ -22,6 +22,6 @@ Framework preset: `None`. Build command: vazio. Build output directory: `public`
 
 ## Identificação (preencha após o fork)
 
-Nome: 
-RA: 
-URL: https://
+Nome: Laura Gois Casteleins
+RA: 2026107733
+URL: https://2bim-Avalia1.pages.dev
