@@ -1,46 +1,85 @@
-// script.js
-// Versao inicial: todo o trabalho acontece no navegador.
-// A tarefa consiste em levar gerarDesenho para o servidor (Pages Functions)
-// e fazer esta pagina apenas enviar o numero e exibir a resposta.
+let tokenGoogle = null;
 
-import { gerarDesenho, numeroValido } from "./desenho.js";
+// Função chamada automaticamente pelo Google Sign-In após o login bem-sucedido
+window.handleCredentialResponse = function(response) {
+  tokenGoogle = response.credential;
+  console.log("Login efetuado com sucesso!");
+  
+  // Habilita o botão de desenhar após o login
+  const btnDesenhar = document.getElementById("btn-desenhar");
+  if (btnDesenhar) {
+    btnDesenhar.disabled = false;
+  }
+  
+  const mensagem = document.getElementById("mensagem");
+  mensagem.textContent = "Autenticado com sucesso! Escolha um número e clique em Desenhar.";
+  mensagem.style.color = "green";
+};
 
-const formulario = document.getElementById("formulario");
-const campoNumero = document.getElementById("numero");
-const campoEmail = document.getElementById("email");
-const area = document.getElementById("desenho");
-const mensagem = document.getElementById("mensagem");
-const botaoBaixar = document.getElementById("baixar");
+document.getElementById("formulario").addEventListener("submit", async function(event) {
+  event.preventDefault();
 
-let svgAtual = "";
+  const numeroInput = document.getElementById("numero").value;
+  const mensagem = document.getElementById("mensagem");
+  const figura = document.getElementById("desenho");
+  const botaoBaixar = document.getElementById("baixar");
 
-formulario.addEventListener("submit", (evento) => {
-  evento.preventDefault();
-  mensagem.textContent = "";
-
-  const numero = Number(campoNumero.value);
-  const email = campoEmail.value.trim();
-
-  if (!numeroValido(numero)) {
-    mensagem.textContent = "Digite um inteiro entre 1 e 100.";
+  if (!tokenGoogle) {
+    mensagem.textContent = "Por favor, faça login com o Google primeiro.";
+    mensagem.style.color = "red";
     return;
   }
-  if (email === "") {
-    mensagem.textContent = "Informe um e-mail.";
+
+  const numero = parseInt(numeroInput, 10);
+  if (isNaN(numero) || numero < 1 || numero > 100) {
+    mensagem.textContent = "Por favor, insira um número válido entre 1 e 100.";
+    mensagem.style.color = "red";
     return;
   }
 
-  svgAtual = gerarDesenho(numero, email);
-  area.innerHTML = svgAtual;
-  botaoBaixar.hidden = false;
-});
+  mensagem.textContent = "A gerar desenho no servidor...";
+  mensagem.style.color = "blue";
+  figura.innerHTML = "";
+  botaoBaixar.hidden = true;
 
-botaoBaixar.addEventListener("click", () => {
-  const arquivo = new Blob([svgAtual], { type: "image/svg+xml" });
-  const url = URL.createObjectURL(arquivo);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "exemplo.svg";
-  link.click();
-  URL.revokeObjectURL(url);
+  try {
+    // Requisição para a nossa Cloudflare Pages Function (/api/desenho)
+    const resposta = await fetch("/api/desenho", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        numero: numero,
+        credential: tokenGoogle
+      })
+    });
+
+    const dados = await resposta.json();
+
+    if (!resposta.ok) {
+      throw new Error(dados.error || "Erro ao comunicar com o servidor.");
+    }
+
+    // Exibe o desenho SVG retornado pelo servidor e assinado
+    figura.innerHTML = dados.svg;
+    mensagem.textContent = `Desenho gerado e assinado para: ${dados.email}`;
+    mensagem.style.color = "green";
+
+    // Configura o botão de baixar
+    botaoBaixar.hidden = false;
+    botaoBaixar.onclick = function() {
+      const blob = new Blob([dados.svg], { type: "image/svg+xml" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `desenho_${numero}.svg`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+  } catch (erro) {
+    mensagem.textContent = `Erro: ${erro.message}`;
+    mensagem.style.color = "red";
+  }
 });
