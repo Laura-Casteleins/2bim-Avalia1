@@ -1,0 +1,6 @@
+name = "2bim-avalia1"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-10-02"
+
+[vars]
+GOOGLE_CLIENT_ID = "753501095881-8k515tk6vfd4sf3iqh6uu45lv6rp13lj.apps.googleusercontent.com"
