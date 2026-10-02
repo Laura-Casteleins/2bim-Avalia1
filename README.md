@@ -24,4 +24,4 @@ Framework preset: `None`. Build command: vazio. Build output directory: `public`
 
 Nome: Laura Gois Casteleins
 RA: 2026107733
-URL: https://2bim-Avalia1.pages.dev
+URL: https:[//2bim-Avalia1.pages.dev](https://2bim-avalia1-a1q.pages.dev/)
